@@ -569,7 +569,7 @@
                     
                     // Option 1: Direct CEIDG API (if API key provided)
                     if (CEIDG_API_KEY) {
-                        const response = await fetch(`https://dane.biznes.gov.pl/api/ceidg/v1/firma?nip=${nip}`, {
+                        const response = await fetch(`https://dane.biznes.gov.pl/api/ceidg/v3/firma?nip=${nip}`, {
                             headers: {
                                 'Authorization': `Bearer ${CEIDG_API_KEY}`
                             }
