@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zgłoszenie Agenta - Autoryzacja Azure AD</title>
+    <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .user-info {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+        .user-info.show {
+            display: block;
+        }
+        .content {
+            padding: 30px;
+        }
+        .login-section {
+            text-align: center;
+            padding: 40px 0;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        .form-group label .required {
+            color: #e91e63;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        .section-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            margin: 30px -30px 20px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .section-header:first-child {
+            margin-top: 0;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+        .loading.show {
+            display: block;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .success-message {
+            background: #4caf50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+        .success-message.show {
+            display: block;
+        }
+        .error-message {
+            background: #f44336;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .error-message.show {
+            display: block;
+        }
+        select[multiple] {
+            height: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Zgłoszenie Agenta</h1>
+            <p>Formularz rejestracji z autoryzacją Microsoft</p>
+            <div class="user-info" id="userInfo">
+                <strong>Zalogowany:</strong> <span id="userName"></span><br>
+                <small id="userEmail"></small>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Login Section -->
+            <div class="login-section" id="loginSection">
+                <h2 style="margin-bottom: 20px;">Zaloguj się przez Microsoft</h2>
+                <button class="btn" id="loginBtn">
+                    <svg style="width:20px;height:20px;margin-right:10px;vertical-align:middle;" viewBox="0 0 23 23">
+                        <rect fill="#f25022" width="11" height="11"/>
+                        <rect fill="#00a4ef" x="12" width="11" height="11"/>
+                        <rect fill="#7fba00" y="12" width="11" height="11"/>
+                        <rect fill="#ffb900" x="12" y="12" width="11" height="11"/>
+                    </svg>
+                    Zaloguj przez Microsoft
+                </button>
+            </div>
+
+            <!-- Loading -->
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Przetwarzanie...</p>
+            </div>
+
+            <!-- Success Message -->
+            <div class="success-message" id="successMessage">
+                <h2>✓ Zgłoszenie wysłane!</h2>
+                <p>Twoje zgłoszenie zostało pomyślnie przesłane.</p>
+                <p style="margin-top:10px;font-size:14px;">ID: <span id="submissionId"></span></p>
+            </div>
+
+            <!-- Error Message -->
+            <div class="error-message" id="errorMessage"></div>
+
+            <!-- Form -->
+            <form id="agentForm" style="display:none;">
+                <!-- Dane podstawowe -->
+                <h3 class="section-header">Dane podstawowe</h3>
+
+                <div class="form-group">
+                    <label>Osoba uzupełniająca zgłoszenie <span class="required">*</span></label>
+                    <input type="text" id="submitter" readonly style="background:#f5f5f5;">
+                </div>
+
+                <div class="form-group">
+                    <label for="entityType">Rodzaj podmiotu <span class="required">*</span></label>
+                    <select id="entityType" required>
+                        <option value="">Wybierz...</option>
+                        <option value="osoba_fizyczna">Agent osoba fizyczna</option>
+                        <option value="osoba_prawna">Agent osoba prawna</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="entityName">Imię i nazwisko / Nazwa podmiotu <span class="required">*</span></label>
+                    <input type="text" id="entityName" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="nip">NIP <span class="required">*</span></label>
+                    <input type="text" id="nip" pattern="[0-9]{10}" placeholder="1234567890" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="pesel">PESEL</label>
+                    <input type="text" id="pesel" pattern="[0-9]{11}" placeholder="12345678901">
+                </div>
+
+                <div class="form-group">
+                    <label for="krs">Numer KRS</label>
+                    <input type="text" id="krs" pattern="[0-9]{10}" placeholder="0000123456">
+                </div>
+
+                <div class="form-group">
+                    <label for="recruiter">Rekrutujący - imię i nazwisko <span class="required">*</span></label>
+                    <input type="text" id="recruiter" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="businessDesc">Opis biznesowy - imię i nazwisko <span class="required">*</span></label>
+                    <input type="text" id="businessDesc" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="salesNetwork">Sieć sprzedaży (wybierz przynajmniej jedną) <span class="required">*</span></label>
+                    <select id="salesNetwork" multiple required>
+                        <option value="BANCASSURANCE">BANCASSURANCE</option>
+                        <option value="UBEZPIECZENIA_GRUPOWE">DEPARTAMENT SPRZEDAŻY UBEZPIECZEŃ GRUPOWYCH</option>
+                        <option value="ZEWNETRZNE_IND">DEPARTAMENT SPRZEDAŻY W SIECIACH ZEWNĘTRZNYCH (IND)</option>
+                        <option value="ZEWNETRZNE_AO">DEPARTAMENT SPRZEDAŻY W SIECIACH ZEWNĘTRZNYCH (AO)</option>
+                    </select>
+                    <small style="color:#666;">Użyj Ctrl/Cmd do zaznaczenia wielu opcji</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="contractTemplate">Szablon umowy agencyjnej <span class="required">*</span></label>
+                    <select id="contractTemplate" required>
+                        <option value="">Wybierz...</option>
+                        <option value="szablon_1">Pole z listy wyboru - szablon 1</option>
+                        <option value="szablon_2">Pole z listy wyboru - szablon 2</option>
+                        <option value="szablon_3">Pole z listy wyboru - szablon 3</option>
+                        <option value="szablon_4">Pole z listy wyboru - szablon 4</option>
+                        <option value="szablon_5">Pole z listy wyboru - szablon 5</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="deviations">Odstępstwa</label>
+                    <textarea id="deviations" placeholder="Opisz ewentualne odstępstwa od standardowej umowy"></textarea>
+                </div>
+
+                <!-- Dokumenty Agent -->
+                <h3 class="section-header">📄 Dokumenty - Agent</h3>
+
+                <div class="form-group">
+                    <label for="doc_ceidg">Aktualne CEIDG lub KRS <span class="required">*</span></label>
+                    <select id="doc_ceidg" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_oswiadczenie_agent">Oświadczenie Agenta <span class="required">*</span></label>
+                    <select id="doc_oswiadczenie_agent" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_polisa_oc">Polisa OC <span class="required">*</span></label>
+                    <select id="doc_polisa_oc" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <!-- Dokumenty OFWCA -->
+                <h3 class="section-header">📄 Dokumenty - OFWCA</h3>
+
+                <div class="form-group">
+                    <label for="ofwca_count">Liczba OFWCA <span class="required">*</span></label>
+                    <input type="number" id="ofwca_count" min="0" value="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_ofwca_oswiadczenie">Oświadczenie OFWCA w zakresie danych osobowych <span class="required">*</span></label>
+                    <select id="doc_ofwca_oswiadczenie" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_ofwca_szkola">Świadectwo ukończenia szkoły (OFWCA) <span class="required">*</span></label>
+                    <select id="doc_ofwca_szkola" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_ofwca_egzamin">Zaświadczenie o zdaniu egzaminu (OFWCA) <span class="required">*</span></label>
+                    <select id="doc_ofwca_egzamin" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_ofwca_krk">Zaświadczenie z KRK (OFWCA) <span class="required">*</span></label>
+                    <select id="doc_ofwca_krk" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <!-- Dokumenty Członek Zarządu -->
+                <h3 class="section-header">📄 Dokumenty - Członek Zarządu</h3>
+
+                <div class="form-group">
+                    <label for="zarzad_count">Liczba członków zarządu <span class="required">*</span></label>
+                    <input type="number" id="zarzad_count" min="0" value="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_zarzad_oswiadczenie">Oświadczenie Członka Zarządu <span class="required">*</span></label>
+                    <select id="doc_zarzad_oswiadczenie" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_zarzad_szkola">Świadectwo ukończenia szkoły (Członek Zarządu) <span class="required">*</span></label>
+                    <select id="doc_zarzad_szkola" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_zarzad_egzamin">Zaświadczenie o zdaniu egzaminu (Członek Zarządu) <span class="required">*</span></label>
+                    <select id="doc_zarzad_egzamin" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_zarzad_krk">Zaświadczenie z KRK (Członek Zarządu) <span class="required">*</span></label>
+                    <select id="doc_zarzad_krk" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <!-- Dokumenty Osoba Bliska -->
+                <h3 class="section-header">📄 Dokumenty - Osoba Bliska</h3>
+
+                <div class="form-group">
+                    <label for="bliska_count">Liczba osób bliskich <span class="required">*</span></label>
+                    <input type="number" id="bliska_count" min="0" value="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_bliska_oswiadczenie">Oświadczenie Bliskie powiązania <span class="required">*</span></label>
+                    <select id="doc_bliska_oswiadczenie" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <!-- Dokumenty Udziałowiec -->
+                <h3 class="section-header">📄 Dokumenty - Udziałowiec</h3>
+
+                <div class="form-group">
+                    <label for="udzialowiec_count">Liczba partnerów/akcjonariuszy <span class="required">*</span></label>
+                    <input type="number" id="udzialowiec_count" min="0" value="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="doc_udzialowiec_oswiadczenie">Oświadczenie Akcjonariusza <span class="required">*</span></label>
+                    <select id="doc_udzialowiec_oswiadczenie" required>
+                        <option value="">Wybierz...</option>
+                        <option value="papierowo">Będzie dosłany papierowo</option>
+                        <option value="elektronicznie">Będzie dosłany elektronicznie</option>
+                        <option value="zalaczony">Załączony do formularza zgłoszeniowego</option>
+                    </select>
+                </div>
+
+                <!-- Komentarz -->
+                <div class="form-group">
+                    <label for="comment">Komentarz dotyczący przesłania dokumentacji</label>
+                    <textarea id="comment" placeholder="Opcjonalne uwagi dotyczące sposobu przesłania dokumentów"></textarea>
+                </div>
+
+                <button type="submit" class="btn" style="width:100%;margin-top:20px;">Wyślij zgłoszenie</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // KONFIGURACJA - ZMIEŃ TE WARTOŚCI
+        // ============================================
+        const AZURE_CONFIG = {
+            clientId: 'TWOJ_CLIENT_ID',           // Z Azure App Registration
+            tenantId: 'TWOJ_TENANT_ID',           // Z Azure App Registration
+            redirectUri: window.location.origin   // Automatycznie GitHub Pages URL
+        };
+
+        const N8N_WEBHOOK_URL = 'https://eqpro.app.n8n.cloud/webhook/agent-form-azure'; // n8n webhook URL
+        
+        // CEIDG API Configuration (opcjonalne - jeśli masz klucz API)
+        const CEIDG_API_KEY = ''; // Zostaw puste aby używać przez n8n proxy
+
+        // ============================================
+        // MSAL Configuration
+        // ============================================
+        const msalConfig = {
+            auth: {
+                clientId: AZURE_CONFIG.clientId,
+                authority: `https://login.microsoftonline.com/${AZURE_CONFIG.tenantId}`,
+                redirectUri: AZURE_CONFIG.redirectUri
+            },
+            cache: {
+                cacheLocation: 'localStorage',
+                storeAuthStateInCookie: false
+            }
+        };
+
+        const loginRequest = {
+            scopes: ['User.Read']
+        };
+
+        const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+        let currentAccount = null;
+
+        // ============================================
+        // Initialize
+        // ============================================
+        msalInstance.handleRedirectPromise().then(response => {
+            if (response) {
+                currentAccount = response.account;
+                showForm();
+            } else {
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length > 0) {
+                    currentAccount = accounts[0];
+                    showForm();
+                }
+            }
+        }).catch(error => {
+            console.error('Redirect error:', error);
+            showError('Błąd autoryzacji: ' + error.message);
+        });
+
+        // ============================================
+        // Login Handler
+        // ============================================
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            try {
+                const response = await msalInstance.loginPopup(loginRequest);
+                currentAccount = response.account;
+                showForm();
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('Błąd logowania: ' + error.message);
+            }
+        });
+
+        // ============================================
+        // Show Form
+        // ============================================
+        function showForm() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('agentForm').style.display = 'block';
+            document.getElementById('userInfo').classList.add('show');
+            
+            // Display user info
+            document.getElementById('userName').textContent = currentAccount.name;
+            document.getElementById('userEmail').textContent = currentAccount.username;
+            document.getElementById('submitter').value = currentAccount.name;
+            
+            // Setup NIP auto-complete
+            setupNipAutoComplete();
+        }
+
+        // ============================================
+        // NIP Auto-Complete from CEIDG
+        // ============================================
+        function setupNipAutoComplete() {
+            const nipField = document.getElementById('nip');
+            const entityNameField = document.getElementById('entityName');
+            const entityTypeField = document.getElementById('entityType');
+            
+            nipField.addEventListener('blur', async function() {
+                const nip = this.value.replace(/[^0-9]/g, '');
+                
+                // Validate NIP length
+                if (nip.length !== 10) return;
+                
+                // Visual feedback - loading
+                entityNameField.style.background = '#fff3cd';
+                entityNameField.value = 'Pobieranie danych z CEIDG...';
+                entityNameField.disabled = true;
+                
+                try {
+                    let data = null;
+                    
+                    // Option 1: Direct CEIDG API (if API key provided)
+                    if (CEIDG_API_KEY) {
+                        const response = await fetch(`https://dane.biznes.gov.pl/api/ceidg/v1/firma?nip=${nip}`, {
+                            headers: {
+                                'Authorization': `Bearer ${CEIDG_API_KEY}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const result = await response.json();
+                            data = result && result.firma && result.firma[0] ? result.firma[0] : null;
+                        }
+                    } 
+                    // Option 2: Proxy through n8n (recommended)
+                    else {
+                        const response = await fetch(`${N8N_WEBHOOK_URL}/ceidg?nip=${nip}`, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `Bearer ${(await msalInstance.acquireTokenSilent({
+                                    ...loginRequest,
+                                    account: currentAccount
+                                })).accessToken}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            data = await response.json();
+                        }
+                    }
+                    
+                    // Process CEIDG data
+                    if (data) {
+                        // Extract name based on entity type
+                        let entityName = '';
+                        let entityType = '';
+                        
+                        if (data.nazwa) {
+                            // Osoba prawna
+                            entityName = data.nazwa;
+                            entityType = 'osoba_prawna';
+                        } else if (data.imie && data.nazwisko) {
+                            // Osoba fizyczna
+                            entityName = `${data.imie} ${data.nazwisko}`;
+                            entityType = 'osoba_fizyczna';
+                        }
+                        
+                        // Fill form fields
+                        if (entityName) {
+                            entityNameField.value = entityName;
+                            entityNameField.style.background = '#e8f5e9'; // Light green
+                            
+                            // Auto-select entity type
+                            if (entityType) {
+                                entityTypeField.value = entityType;
+                            }
+                            
+                            // Optional: Fill other fields if available
+                            if (data.numer_krs) {
+                                document.getElementById('krs').value = data.numer_krs;
+                            }
+                            
+                            console.log('✓ CEIDG data loaded:', data);
+                        } else {
+                            throw new Error('Brak danych w odpowiedzi CEIDG');
+                        }
+                    } else {
+                        throw new Error('Nie znaleziono podmiotu w CEIDG');
+                    }
+                    
+                } catch (error) {
+                    console.error('CEIDG error:', error);
+                    
+                    // Reset field and show error
+                    entityNameField.value = '';
+                    entityNameField.style.background = '#ffebee'; // Light red
+                    entityNameField.placeholder = '⚠️ Nie znaleziono w CEIDG - wprowadź ręcznie';
+                    
+                    // Show temporary error message
+                    showError(`CEIDG: ${error.message}`);
+                    
+                    setTimeout(() => {
+                        entityNameField.style.background = '#fff';
+                        entityNameField.placeholder = '';
+                    }, 3000);
+                } finally {
+                    entityNameField.disabled = false;
+                }
+            });
+        }
+
+        // ============================================
+        // Form Submit Handler
+        // ============================================
+        document.getElementById('agentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Show loading
+            document.getElementById('agentForm').style.display = 'none';
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('errorMessage').classList.remove('show');
+            
+            try {
+                // Get access token
+                const tokenResponse = await msalInstance.acquireTokenSilent({
+                    ...loginRequest,
+                    account: currentAccount
+                });
+                
+                // Collect form data
+                const formData = {
+                    // Azure AD User Info
+                    azureUser: {
+                        name: currentAccount.name,
+                        email: currentAccount.username,
+                        userId: currentAccount.homeAccountId,
+                        tenantId: currentAccount.tenantId
+                    },
+                    // Basic data
+                    submitter: document.getElementById('submitter').value,
+                    entityType: document.getElementById('entityType').value,
+                    entityName: document.getElementById('entityName').value,
+                    nip: document.getElementById('nip').value,
+                    pesel: document.getElementById('pesel').value || null,
+                    krs: document.getElementById('krs').value || null,
+                    recruiter: document.getElementById('recruiter').value,
+                    businessDesc: document.getElementById('businessDesc').value,
+                    salesNetwork: Array.from(document.getElementById('salesNetwork').selectedOptions).map(o => o.value),
+                    contractTemplate: document.getElementById('contractTemplate').value,
+                    deviations: document.getElementById('deviations').value || null,
+                    // Documents - Agent
+                    documents: {
+                        agent: {
+                            ceidg_krs: document.getElementById('doc_ceidg').value,
+                            oswiadczenie: document.getElementById('doc_oswiadczenie_agent').value,
+                            polisa_oc: document.getElementById('doc_polisa_oc').value
+                        },
+                        ofwca: {
+                            count: parseInt(document.getElementById('ofwca_count').value),
+                            oswiadczenie: document.getElementById('doc_ofwca_oswiadczenie').value,
+                            szkola: document.getElementById('doc_ofwca_szkola').value,
+                            egzamin: document.getElementById('doc_ofwca_egzamin').value,
+                            krk: document.getElementById('doc_ofwca_krk').value
+                        },
+                        zarzad: {
+                            count: parseInt(document.getElementById('zarzad_count').value),
+                            oswiadczenie: document.getElementById('doc_zarzad_oswiadczenie').value,
+                            szkola: document.getElementById('doc_zarzad_szkola').value,
+                            egzamin: document.getElementById('doc_zarzad_egzamin').value,
+                            krk: document.getElementById('doc_zarzad_krk').value
+                        },
+                        bliska: {
+                            count: parseInt(document.getElementById('bliska_count').value),
+                            oswiadczenie: document.getElementById('doc_bliska_oswiadczenie').value
+                        },
+                        udzialowiec: {
+                            count: parseInt(document.getElementById('udzialowiec_count').value),
+                            oswiadczenie: document.getElementById('doc_udzialowiec_oswiadczenie').value
+                        }
+                    },
+                    comment: document.getElementById('comment').value || null,
+                    submittedAt: new Date().toISOString()
+                };
+                
+                // Send to n8n webhook
+                const response = await fetch(N8N_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${tokenResponse.accessToken}`
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                // Show success
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('successMessage').classList.add('show');
+                document.getElementById('submissionId').textContent = result.submissionId || result.id || 'OK';
+                
+            } catch (error) {
+                console.error('Submit error:', error);
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('agentForm').style.display = 'block';
+                showError('Błąd wysyłania: ' + error.message);
+            }
+        });
+        
+        // ============================================
+        // Error Handler
+        // ============================================
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+            setTimeout(() => errorDiv.classList.remove('show'), 5000);
+        }
+    </script>
+</body>
+</html>
