@@ -174,7 +174,6 @@
         </div>
 
         <div class="content">
-            <!-- Login Section -->
             <div class="login-section" id="loginSection">
                 <h2 style="margin-bottom: 20px;">Zaloguj się przez Microsoft</h2>
                 <button class="btn" id="loginBtn">
@@ -188,25 +187,20 @@
                 </button>
             </div>
 
-            <!-- Loading -->
             <div class="loading" id="loading">
                 <div class="spinner"></div>
                 <p>Przetwarzanie...</p>
             </div>
 
-            <!-- Success Message -->
             <div class="success-message" id="successMessage">
                 <h2>✓ Zgłoszenie wysłane!</h2>
                 <p>Twoje zgłoszenie zostało pomyślnie przesłane.</p>
                 <p style="margin-top:10px;font-size:14px;">ID: <span id="submissionId"></span></p>
             </div>
 
-            <!-- Error Message -->
             <div class="error-message" id="errorMessage"></div>
 
-            <!-- Form -->
             <form id="agentForm" style="display:none;">
-                <!-- Dane podstawowe -->
                 <h3 class="section-header">Dane podstawowe</h3>
 
                 <div class="form-group">
@@ -281,7 +275,6 @@
                     <textarea id="deviations" placeholder="Opisz ewentualne odstępstwa od standardowej umowy"></textarea>
                 </div>
 
-                <!-- Dokumenty Agent -->
                 <h3 class="section-header">📄 Dokumenty - Agent</h3>
 
                 <div class="form-group">
@@ -314,7 +307,6 @@
                     </select>
                 </div>
 
-                <!-- Dokumenty OFWCA -->
                 <h3 class="section-header">📄 Dokumenty - OFWCA</h3>
 
                 <div class="form-group">
@@ -362,7 +354,6 @@
                     </select>
                 </div>
 
-                <!-- Dokumenty Członek Zarządu -->
                 <h3 class="section-header">📄 Dokumenty - Członek Zarządu</h3>
 
                 <div class="form-group">
@@ -410,7 +401,6 @@
                     </select>
                 </div>
 
-                <!-- Dokumenty Osoba Bliska -->
                 <h3 class="section-header">📄 Dokumenty - Osoba Bliska</h3>
 
                 <div class="form-group">
@@ -428,7 +418,6 @@
                     </select>
                 </div>
 
-                <!-- Dokumenty Udziałowiec -->
                 <h3 class="section-header">📄 Dokumenty - Udziałowiec</h3>
 
                 <div class="form-group">
@@ -446,7 +435,6 @@
                     </select>
                 </div>
 
-                <!-- Komentarz -->
                 <div class="form-group">
                     <label for="comment">Komentarz dotyczący przesłania dokumentacji</label>
                     <textarea id="comment" placeholder="Opcjonalne uwagi dotyczące sposobu przesłania dokumentów"></textarea>
@@ -458,23 +446,15 @@
     </div>
 
     <script>
-        // ============================================
-        // KONFIGURACJA - ZMIEŃ TE WARTOŚCI
-        // ============================================
         const AZURE_CONFIG = {
-            clientId: 'c0f86162-0190-4411-a1c3-78fc6390213c',           // Z Azure App Registration
-            tenantId: 'bd1fe3eb-ddfa-458e-9340-f1d38d2912ee',           // Z Azure App Registration
-            redirectUri: window.location.origin   // Automatycznie GitHub Pages URL
+            clientId: 'c0f86162-0190-4411-a1c3-78fc6390213c',
+            tenantId: 'bd1fe3eb-ddfa-458e-9340-f1d38d2912ee',
+            redirectUri: 'https://bagisenior.github.io'
         };
 
-        const N8N_WEBHOOK_URL = 'https://eqpro.app.n8n.cloud/webhook/agent-form-azure'; // n8n webhook URL
+        const N8N_WEBHOOK_URL = 'https://eqpro.app.n8n.cloud/webhook/agent-form-azure';
+        const N8N_CEIDG_LOOKUP_URL = 'https://eqpro.app.n8n.cloud/webhook/ceidg-check-nip';
         
-        // CEIDG API Configuration (opcjonalne - jeśli masz klucz API)
-        const CEIDG_API_KEY = 'eyJraWQiOiJjZWlkZyIsImFsZyI6IkhTNTEyIn0.eyJnaXZlbl9uYW1lIjoiREFSSVVTWiIsInBlc2VsIjoiNzQxMTIyMDAxOTkiLCJpYXQiOjE3Mzg4NDc4NjAsImZhbWlseV9uYW1lIjoiQkFHScWDU0tJIiwiY2xpZW50X2lkIjoiVVNFUi03NDExMjIwMDE5OS1EQVJJVVNaLUJBR0nFg1NLSSJ9.7CTnkSy1gLpCF0wxDW8hduQ0wty3padejUtqxK2PAeI0TpMiujHM6YFTh631dAbSo1e2hSGrrHCqEvzwNu9kWg'; // Zostaw puste aby używać przez n8n proxy
-
-        // ============================================
-        // MSAL Configuration
-        // ============================================
         const msalConfig = {
             auth: {
                 clientId: AZURE_CONFIG.clientId,
@@ -492,12 +472,8 @@
         };
 
         const msalInstance = new msal.PublicClientApplication(msalConfig);
-
         let currentAccount = null;
 
-        // ============================================
-        // Initialize
-        // ============================================
         msalInstance.handleRedirectPromise().then(response => {
             if (response) {
                 currentAccount = response.account;
@@ -514,9 +490,6 @@
             showError('Błąd autoryzacji: ' + error.message);
         });
 
-        // ============================================
-        // Login Handler
-        // ============================================
         document.getElementById('loginBtn').addEventListener('click', async () => {
             try {
                 const response = await msalInstance.loginPopup(loginRequest);
@@ -528,26 +501,18 @@
             }
         });
 
-        // ============================================
-        // Show Form
-        // ============================================
         function showForm() {
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('agentForm').style.display = 'block';
             document.getElementById('userInfo').classList.add('show');
             
-            // Display user info
             document.getElementById('userName').textContent = currentAccount.name;
             document.getElementById('userEmail').textContent = currentAccount.username;
             document.getElementById('submitter').value = currentAccount.name;
             
-            // Setup NIP auto-complete
             setupNipAutoComplete();
         }
 
-        // ============================================
-        // NIP Auto-Complete from CEIDG
-        // ============================================
         function setupNipAutoComplete() {
             const nipField = document.getElementById('nip');
             const entityNameField = document.getElementById('entityName');
@@ -556,79 +521,54 @@
             nipField.addEventListener('blur', async function() {
                 const nip = this.value.replace(/[^0-9]/g, '');
                 
-                // Validate NIP length
                 if (nip.length !== 10) return;
                 
-                // Visual feedback - loading
                 entityNameField.style.background = '#fff3cd';
                 entityNameField.value = 'Pobieranie danych z CEIDG...';
                 entityNameField.disabled = true;
                 
                 try {
-                    let data = null;
+                    const response = await fetch(`${N8N_CEIDG_LOOKUP_URL}?nip=${nip}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
                     
-                    // Option 1: Direct CEIDG API (if API key provided)
-                    if (CEIDG_API_KEY) {
-                        const response = await fetch(`https://dane.biznes.gov.pl/api/ceidg/v3/firma?nip=${nip}`, {
-                            headers: {
-                                'Authorization': `Bearer ${CEIDG_API_KEY}`
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            const result = await response.json();
-                            data = result && result.firma && result.firma[0] ? result.firma[0] : null;
-                        }
-                    } 
-                    // Option 2: Proxy through n8n (recommended)
-                    else {
-                        const response = await fetch(`${N8N_WEBHOOK_URL}/ceidg?nip=${nip}`, {
-                            method: 'GET',
-                            headers: {
-                                'Authorization': `Bearer ${(await msalInstance.acquireTokenSilent({
-                                    ...loginRequest,
-                                    account: currentAccount
-                                })).accessToken}`
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            data = await response.json();
-                        }
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
                     
-                    // Process CEIDG data
-                    if (data) {
-                        // Extract name based on entity type
+                    const result = await response.json();
+                    const data = result.data || result;
+                    
+                    if (data && data.firma && data.firma.length > 0) {
+                        const firm = data.firma[0];
+                        
                         let entityName = '';
                         let entityType = '';
                         
-                        if (data.nazwa) {
-                            // Osoba prawna
-                            entityName = data.nazwa;
+                        if (firm.nazwa) {
+                            entityName = firm.nazwa;
                             entityType = 'osoba_prawna';
-                        } else if (data.imie && data.nazwisko) {
-                            // Osoba fizyczna
-                            entityName = `${data.imie} ${data.nazwisko}`;
+                        } else if (firm.imie && firm.nazwisko) {
+                            entityName = `${firm.imie} ${firm.nazwisko}`;
                             entityType = 'osoba_fizyczna';
                         }
                         
-                        // Fill form fields
                         if (entityName) {
                             entityNameField.value = entityName;
-                            entityNameField.style.background = '#e8f5e9'; // Light green
+                            entityNameField.style.background = '#e8f5e9';
                             
-                            // Auto-select entity type
                             if (entityType) {
                                 entityTypeField.value = entityType;
                             }
                             
-                            // Optional: Fill other fields if available
-                            if (data.numer_krs) {
-                                document.getElementById('krs').value = data.numer_krs;
+                            if (firm.numer_krs) {
+                                document.getElementById('krs').value = firm.numer_krs;
                             }
                             
-                            console.log('✓ CEIDG data loaded:', data);
+                            console.log('✓ CEIDG data loaded:', firm);
                         } else {
                             throw new Error('Brak danych w odpowiedzi CEIDG');
                         }
@@ -639,12 +579,10 @@
                 } catch (error) {
                     console.error('CEIDG error:', error);
                     
-                    // Reset field and show error
                     entityNameField.value = '';
-                    entityNameField.style.background = '#ffebee'; // Light red
+                    entityNameField.style.background = '#ffebee';
                     entityNameField.placeholder = '⚠️ Nie znaleziono w CEIDG - wprowadź ręcznie';
                     
-                    // Show temporary error message
                     showError(`CEIDG: ${error.message}`);
                     
                     setTimeout(() => {
@@ -657,34 +595,26 @@
             });
         }
 
-        // ============================================
-        // Form Submit Handler
-        // ============================================
         document.getElementById('agentForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            // Show loading
             document.getElementById('agentForm').style.display = 'none';
             document.getElementById('loading').classList.add('show');
             document.getElementById('errorMessage').classList.remove('show');
             
             try {
-                // Get access token
                 const tokenResponse = await msalInstance.acquireTokenSilent({
                     ...loginRequest,
                     account: currentAccount
                 });
                 
-                // Collect form data
                 const formData = {
-                    // Azure AD User Info
                     azureUser: {
                         name: currentAccount.name,
                         email: currentAccount.username,
                         userId: currentAccount.homeAccountId,
                         tenantId: currentAccount.tenantId
                     },
-                    // Basic data
                     submitter: document.getElementById('submitter').value,
                     entityType: document.getElementById('entityType').value,
                     entityName: document.getElementById('entityName').value,
@@ -696,7 +626,6 @@
                     salesNetwork: Array.from(document.getElementById('salesNetwork').selectedOptions).map(o => o.value),
                     contractTemplate: document.getElementById('contractTemplate').value,
                     deviations: document.getElementById('deviations').value || null,
-                    // Documents - Agent
                     documents: {
                         agent: {
                             ceidg_krs: document.getElementById('doc_ceidg').value,
@@ -730,7 +659,6 @@
                     submittedAt: new Date().toISOString()
                 };
                 
-                // Send to n8n webhook
                 const response = await fetch(N8N_WEBHOOK_URL, {
                     method: 'POST',
                     headers: {
@@ -746,7 +674,6 @@
                 
                 const result = await response.json();
                 
-                // Show success
                 document.getElementById('loading').classList.remove('show');
                 document.getElementById('successMessage').classList.add('show');
                 document.getElementById('submissionId').textContent = result.submissionId || result.id || 'OK';
@@ -759,9 +686,6 @@
             }
         });
         
-        // ============================================
-        // Error Handler
-        // ============================================
         function showError(message) {
             const errorDiv = document.getElementById('errorMessage');
             errorDiv.textContent = message;
